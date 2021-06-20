@@ -74,110 +74,125 @@ boolean playing = true;
 void draw() {
   background(0);
 
-  if (hasToken) {
-    if (!done) {
-    }
+  try {
 
-    if(playing)
-    pm += millis()-last_pm;
-    last_pm = millis();
-    if (millis()-last_check > check_amount || pm > duration-500) {
-      done = false;
+    if (hasToken) {
+      if (!done) {
+      }
 
-      last_check = millis();
-      requestHTTP();
-      //println(answer);
+      if (playing)
+        pm += millis()-last_pm;
+      last_pm = millis();
+      if (millis()-last_check > check_amount || pm > duration-500) {
+        done = false;
+
+        last_check = millis();
+        requestHTTP();
+        //println(answer);
+        if (answer != null) {
+          JSONObject item = answer.getJSONObject("item");
+
+          String u = item.getString("name");
+
+          String new_u = "";
+          for (int i = 0; i < u.length(); i++) {
+            if (u.charAt(i) != ' ') {
+              new_u += u.charAt(i);
+            } else {
+              new_u += "%20";
+            }
+          }
+
+          try {
+            if (title != item.getString("name")) {
+              String[] s = loadStrings("https://api.textyl.co/api/lyrics?q=" + new_u);
+              //println(s[0]);
+              if (s.length > 1 || s[0].length() > 100)
+                lyrics = loadJSONArray("https://api.textyl.co/api/lyrics?q=" + new_u);
+              else lyrics = null;
+            }
+          } 
+          catch (NullPointerException p) {
+            lyrics = null;
+            println(p);
+            println("no lyrics lmao");
+          }
+
+          cover_image = loadImage(item.getJSONObject("album").getJSONArray("images").getJSONObject(0).getString("url"), "png");
+          pm = answer.getInt("progress_ms");
+
+          duration = item.getInt("duration_ms");
+          title = item.getString("name");
+          author = item.getJSONArray("artists").getJSONObject(0).getString("name");
+          playing = answer.getBoolean("is_playing");
+        }
+      }
+
       if (answer != null) {
-        JSONObject item = answer.getJSONObject("item");
 
-        String u = item.getString("name");
-
-        String new_u = "";
-        for (int i = 0; i < u.length(); i++) {
-          if (u.charAt(i) != ' ') {
-            new_u += u.charAt(i);
-          } else {
-            new_u += "%20";
-          }
-        }
-
-        try {
-          if (title != item.getString("name")) {
-            String[] s = loadStrings("https://api.textyl.co/api/lyrics?q=" + new_u);
-            //println(s[0]);
-            if (s.length > 1 || s[0].length() > 100)
-              lyrics = loadJSONArray("https://api.textyl.co/api/lyrics?q=" + new_u);
-            else lyrics = null;
-          }
-        } 
-        catch (NullPointerException p) {
-          lyrics = null;
-          println(p);
-          println("no lyrics lmao");
-        }
-
-        cover_image = loadImage(item.getJSONObject("album").getJSONArray("images").getJSONObject(0).getString("url"), "png");
-        pm = answer.getInt("progress_ms");
-
-        duration = item.getInt("duration_ms");
-        title = item.getString("name");
-        author = item.getJSONArray("artists").getJSONObject(0).getString("name");
-        playing = answer.getBoolean("is_playing");
-      }
-    }
-
-    if (answer != null) {
-
-      fill(204, 104, 0);
-      rect(0, 0, width, 500);
-      fill(255);
-      textAlign(LEFT, TOP);
-      int ts = 120;
-      textSize(ts);
-      while (textWidth(title) > width-700) {
+        fill(204, 104, 0);
+        rect(0, 0, width, 500);
+        fill(255);
+        textAlign(LEFT, TOP);
+        int ts = 120;
         textSize(ts);
-        ts--;
+        while (textWidth(title) > width-700) {
+          textSize(ts);
+          ts--;
+        }
+
+        text(title, 500, 50);
+        float title_width = textWidth(title);
+        textSize(25);
+        textAlign(LEFT, BOTTOM);
+        text(author, 500+title_width+20, 50+ts);
+
+        String l = "";
+
+        //println(answer);
+        if (lyrics != null) {
+          for (int i = lyrics.size()-1; i >= 0; i--) {
+            if (lyrics.getJSONObject(i).getInt("seconds") < pm*0.001-1) {
+              l = lyrics.getJSONObject(i).getString("lyrics");
+              break;
+            }
+          }
+        } else l = "Kein Text vorhanden D:";
+        textAlign(LEFT, TOP);
+        textSize(60);
+        text(l, 500, 200, width-600, 200);
+
+        //text(pm,500,400);
+
+
+        textAlign(RIGHT, TOP);
+        text(nf(hour(), 2) + ":" + nf(minute(), 2), width, 0);
+      }
+      if (cover_image != null)
+        image(cover_image, 50, 50, 400, 400);
+
+      if (showQR) {
+        textSize(40);
+        textAlign(CENTER, CENTER);
+        text("Musik-Wünsche:", 250, 25);  
+        image(qr, 50, 50, 400, 400);
       }
 
-      text(title, 500, 50);
-      float title_width = textWidth(title);
-      textSize(25);
-      textAlign(LEFT, BOTTOM);
-      text(author, 500+title_width+20, 50+ts);
+      noCursor();
 
-      String l = "";
-
-      //println(answer);
-      if (lyrics != null) {
-        for (int i = lyrics.size()-1; i >= 0; i--) {
-          if (lyrics.getJSONObject(i).getInt("seconds") < pm*0.001-1) {
-            l = lyrics.getJSONObject(i).getString("lyrics");
-            break;
-          }
-        }
-      } else l = "Kein Text vorhanden D:";
-      textAlign(LEFT, TOP);
-      textSize(60);
-      text(l, 500, 200, width-600, 200);
-
-      //text(pm,500,400);
+      if (millis()-last_refreshed_token > refresh_token_amount) {
+        updateToken();
+        last_refreshed_token = millis();
+      }
     }
-    if (cover_image != null)
-      image(cover_image, 50, 50, 400, 400);
-
-    if (showQR) {
-      textSize(40);
-      textAlign(CENTER, CENTER);
-      text("Musik-Wünsche:", 250, 25);  
-      image(qr, 50, 50, 400, 400);
-    }
-
-    noCursor();
-
-    if (millis()-last_refreshed_token > refresh_token_amount) {
-      updateToken();
-      last_refreshed_token = millis();
-    }
+  } 
+  catch (Exception e) {
+    fill(204, 104, 0);
+    rect(0, 0, width, 500);
+    fill(255);
+    textSize(15);
+    textAlign(LEFT,BOTTOM);
+    text("Fehler: " + e, 0, height);
   }
 }
 
